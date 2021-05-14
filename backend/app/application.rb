@@ -1,5 +1,4 @@
-require "Pry"
-
+require 'pry'
 class Application
 
   def call(env)
@@ -11,10 +10,8 @@ class Application
       
       return [200, { 'Content-Type' => 'application/json' }, [ seasons.to_json ]]
 
-    elsif req.path.match('/seasons/') && req.get?
-      id = req.path.split("/").last
-
-      produces = Produce.where(season_id: id)
+    elsif req.path == "/produces" && req.get?
+      produces = Produce.all
 
       return [200, { 'Content-Type' => 'application/json' }, [ produces.to_json ]]
 
@@ -23,13 +20,29 @@ class Application
 
       return [200, { 'Content-Type' => 'application/json' }, [ recipes.to_json ]]
 
-    elsif req.path.match('/recipes/') && req.get?
+    elsif req.path == ('/producerecipes') && req.get?
+      producerecipes = ProduceRecipe.all
+
+      return [200, { 'Content-Type' => 'application/json' }, [ producerecipes.to_json ]]
+
+    elsif req.path.match('/seasons/') && req.get?
       id = req.path.split("/").last
 
-      recipes = Season.find_by(id: id).recipes
+      produces = Produce.where(season_id: id)
 
-      return [200, { 'Content-Type' => 'application/json' }, [ recipes.uniq.to_json ]]
+      return [200, { 'Content-Type' => 'application/json' }, [ produces.to_json ]]
 
+    elsif req.path.match('/recipes/') && req.get?
+      rec_path = req.path.split("/").last
+
+      if rec_path.size < 3
+        recipes = Season.find_by(id: rec_path).recipes.uniq
+      else
+        name = rec_path.split('-').join(' ')
+        recipes = Recipe.where("lower(name) = ?", name.downcase).first
+      end
+
+      return [200, { 'Content-Type' => 'application/json' }, [ recipes.to_json ]]
 
     elsif req.path.match("/recipes") && req.post?
       hash = JSON.parse(req.body.read)
@@ -57,6 +70,14 @@ class Application
       produce.update(hash)
 
       return [201, { 'Content-Type' => 'application/json' }, [ produce.to_json ]]
+
+    elsif req.path.match('/recipes/') && req.delete?
+      name = req.path.split('/recipes/').last.split('-').map(&:capitalize).join(' ')
+
+      recipe = Recipe.where("lower(name) = ?", name.downcase).first
+      recipe.destroy
+
+      return [200, { 'Content-Type' => 'application/json'}, [recipe.to_json]]
 
     else
       resp.write "Path Not Found"
